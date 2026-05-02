@@ -1,88 +1,87 @@
 /**
- * JB Architect Studio - Main Entry
- * Compatible with SillyTavern v1.17.0 Staging
- * Architecture: IIFE + Event-Driven + Config-First
+ * JB Architect Studio - Main Entry Point
+ * SillyTavern Extension v1.0.0-alpha
+ * Compatible with ST v1.17.0+
  */
-(function ($) {
+(function($) {
     'use strict';
 
+    // ================= CONSTANTS =================
     const MODULE_NAME = 'JB_Architect_Studio';
-    const STORAGE_KEY = 'jb_studio_v1_config';
+    const EXTENSION_ID = 'jb-architect-studio';
+    const CONFIG_KEY = 'jb_studio_config_v1';
 
-    // Safe API Access
-    const ST = window.extension_api;
-    if (!ST) {
-        console.error(`[${MODULE_NAME}] SillyTavern extension_api not detected. Extension halted.`);
-        return;
-    }
-
-    // Default Configuration
+    // ================= CONFIG SYSTEM =================
     const defaultConfig = {
         enabled: true,
+        debugMode: false,
         thinkDecoder: true,
         slopRadar: true,
-        promptArchitect: true,
-        externalApiUrl: '',      // สำหรับ API แยก (v2)
-        externalApiKey: '',
-        debugMode: false
+        autoInject: false,
+        language: 'th'
     };
 
     let config = { ...defaultConfig };
 
-    // ================= INITIALIZATION =================
-    async function init() {
-        console.log(`[${MODULE_NAME}] 🚀 Initializing...`);
-        loadConfig();
-        setupCoreUI();
-        bindEvents();
-        console.log(`[${MODULE_NAME}] ✅ Ready.`);
-    }
-
-    // ================= CONFIG MANAGEMENT =================
     function loadConfig() {
         try {
-            const saved = localStorage.getItem(STORAGE_KEY);
+            const saved = localStorage.getItem(CONFIG_KEY);
             if (saved) {
                 const parsed = JSON.parse(saved);
                 config = { ...defaultConfig, ...parsed };
+                console.log(`[${MODULE_NAME}] ⚙️ Config loaded`);
             }
-        } catch (err) {
-            console.warn(`[${MODULE_NAME}] ⚠️ Failed to load config, using defaults.`);        }
+        } catch (e) {
+            console.warn(`[${MODULE_NAME}] ⚠️ Config load failed, using defaults`, e);
+            config = { ...defaultConfig };
+        }
     }
 
     function saveConfig() {
         try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-        } catch (err) {
-            console.error(`[${MODULE_NAME}] ❌ Config save failed.`, err);
+            localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+        } catch (e) {
+            console.warn(`[${MODULE_NAME}] ⚠️ Config save failed`, e);
         }
     }
 
-    // ================= EVENT BINDING =================
-    function bindEvents() {
-        // SillyTavern jQuery Events (v1.17 compatible)
-        $(document).on('message_received', handleNewMessage);
-        $(document).on('chat_loaded', handleChatLoad);
-        $(document).on('ST:MESSAGE_DELETED', handleMessageDeleted);
+    // ================= CONFIG & DATA (ส่วนที่เพิ่มใหม่) =================
+    let slopDictionary = [];
+    async function loadSlopDictionary() {
+        try {
+            // extensionAPI จะถูก inject โดย SillyTavern อัตโนมัติ
+            const response = await fetch(extensionAPI.getFileUrl('data/slop_dict.json'));
+            const data = await response.json();
+            
+            // รวมทุกหมวดเป็น array เดียวสำหรับสแกน
+            slopDictionary = [
+                ...data.categories.thai_cliches,
+                ...data.categories.english_cliches,
+                ...data.categories.ai_slop_phrases,
+                ...data.categories.ooc_markers
+            ];
+            
+            console.log(`[JB Studio] 📚 Loaded ${slopDictionary.length} slop patterns`);
+        } catch (error) {
+            console.error('[JB Studio] ❌ Failed to load slop dictionary:', error);
+            slopDictionary = [];
+        }
     }
 
-    function handleNewMessage(event, messageData) {
+    // ================= EVENT HOOKS =================
+    function onMessageReceived(event, messageData) {
         if (!config.enabled) return;
-        
-        // messageData payload: { id, mes, is_user, is_system, swipes, send_date, ... }
-        console.log(`[${MODULE_NAME}] 📨 New message received: ID ${messageData.id}`);
-        
-        if (config.thinkDecoder) processThinkDecoder(messageData);
-        if (config.slopRadar) processSlopRadar(messageData);
-    }
+        if (!messageData?.mes || messageData.is_system) return;
 
-    function handleChatLoad() {
-        console.log(`[${MODULE_NAME}] 🔄 Chat loaded. Ready for scan.`);
-        // Phase 2: Re-scan visible messages if needed
-    }
+        console.log(`📨 New message received: ID ${messageData.id}`);
 
-    function handleMessageDeleted(event, data) {
-        // Cleanup UI references for deleted messages
+        // เรียกใช้ Module ที่เปิดใช้งาน
+        if (config.thinkDecoder) {
+            processThinkDecoder(messageData);
+        }
+        if (config.slopRadar) {
+            processSlopRadar(messageData);
+        }
     }
 
     // ================= PHASE 1 MODULES =================
@@ -93,14 +92,13 @@
         const structured = JBParser.structureThinkContent(thinkRaw);
         const btnId = `jb-think-${messageData.id}`;
 
-        // Hide original <think> from UI
+        // ซ่อน <think> จาก UI หลัก
         const $msg = $(`[data-id="${messageData.id}"]`);
         $msg.find('p').each(function() {
             const html = $(this).html();
-            $(this).html(html.replace(/<think>[\s\S]*?<\/think>/gi, ''));
-        });
+            $(this).html(html.replace(/<think>[\s\S]*?<\/think>/gi, ''));        });
 
-        // Inject Toggle Button
+        // เพิ่มปุ่ม Toggle
         $msg.find('.mes-buttons').prepend(`
             <div id="${btnId}" class="jb-think-toggle" title="View CoT Dashboard">
                 🧠 <span>Thinking Process</span>
@@ -109,26 +107,25 @@
 
         $(`#${btnId}`).on('click', () => {
             alert(`[JB Studio] 📊 CoT Summary:\n${structured.summary}\n\nKey Points:\n${structured.keyPoints.join('\n')}`);
-            // Phase 2: จะเปลี่ยนจาก alert เป็น Slide Panel จริง
+            // Phase 2: จะเปลี่ยนเป็น Slide Panel จริง
         });
     }
 
     function processSlopRadar(messageData) {
-        if (!config.slopRadar) return;
+        if (!config.slopRadar || slopDictionary.length === 0) return;
         
-        // ตัวอย่าง Dictionary ชั่วคราว (Phase 2 จะโหลดจาก JSON ภายนอก)
-        const testDict = ['ราวกับว่า', 'ดวงตาเป็นประกาย', 'ความรู้สึกแปลกๆ', 'a shiver ran down'];
-        const matches = JBParser.scanForSlop(messageData.mes, testDict);
+        const matches = JBParser.scanForSlop(messageData.mes, slopDictionary);
         if (matches.length === 0) return;
 
         const highlighted = JBParser.applySlopHighlights(messageData.mes, matches);
         
-        // อัปเดตข้อความใน DOM (ST v1.17 อนุญาตให้แก้ .mes-text ได้)
+        // อัปเดตข้อความใน DOM
         const $msg = $(`[data-id="${messageData.id}"] .mes-text`);
         $msg.html(highlighted);
         
         console.log(`[Slop Radar] 🚨 Found ${matches.length} slop words in msg ${messageData.id}`);
     }
+
     // ================= UI SETUP =================
     function setupCoreUI() {
         const $container = $(`
@@ -148,7 +145,6 @@
         `);
 
         $('body').append($container);
-
         // UI Interactions
         $('#jb-studio-fab').on('click', () => $('#jb-studio-panel').toggleClass('active'));
         $('#jb-studio-close').on('click', () => $('#jb-studio-panel').removeClass('active'));
@@ -159,6 +155,24 @@
     }
 
     // ================= BOOT =================
+    async function init() {
+        console.log(`[${MODULE_NAME}] 🚀 Initializing...`);
+        
+        // 1. โหลด config
+        loadConfig();
+        
+        // 2. โหลด dictionary (await เพราะเป็น async)
+        await loadSlopDictionary();
+        
+        // 3. ตั้งค่า UI
+        setupCoreUI();
+        
+        // 4. Hook events
+        $(document).on('message_received', onMessageReceived);
+        
+        console.log(`[${MODULE_NAME}] ✅ Ready.`);
+    }
+
     $(document).ready(init);
 
 })(jQuery);
