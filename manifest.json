@@ -3,7 +3,7 @@
   "loading_order": 100,
   "requires": [],
   "optional": [],
-  "js": ["lib/parser.js", "index.js"],
+  "js": "lib/parser.js", "index.js",
   "css": "style.css",
   "author": "meowlin007",
   "version": "1.0.0",
