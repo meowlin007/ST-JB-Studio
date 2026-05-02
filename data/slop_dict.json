@@ -1,0 +1,56 @@
+{
+  "version": "1.0.0",
+  "lastUpdated": "2026-05-02",
+  "categories": {
+    "thai_cliches": [
+      "ราวกับว่า",
+      "ดวงตาเป็นประกาย",
+      "ความรู้สึกแปลกๆ",
+      "สัมผัสได้ถึง",
+      "แผ่ออกมาจากร่างกาย",
+      "บรรยากาศรอบตัว",
+      "น้ำเสียงสั่นเครือ",
+      "ริมฝีปากเม้มแน่น",
+      "หัวใจเต้นแรง",
+      "ความเงียบงันปกคลุม"
+    ],
+    "english_cliches": [
+      "a shiver ran down",
+      "eyes sparkled",
+      "felt a strange",
+      "atmosphere shifted",
+      "heart pounded",
+      "lips pressed into",
+      "voice trembled",
+      "couldn't help but",
+      "a sense of",
+      "as if"
+    ],
+    "ai_slop_phrases": [
+      "it's important to note",
+      "delve into",
+      "tapestry of",
+      "testament to",
+      "in conclusion",
+      "moreover",
+      "furthermore",
+      "it's worth noting"
+    ],
+    "ooc_markers": [
+      "user:",
+      "character:",
+      "[System:",
+      "(OOC:",
+      "((out of character"
+    ]
+  },
+  "settings": {
+    "enabledByDefault": true,
+    "highlightSeverity": {
+      "thai_cliches": "warning",
+      "english_cliches": "warning",
+      "ai_slop_phrases": "error",
+      "ooc_markers": "critical"
+    }
+  }
+}
