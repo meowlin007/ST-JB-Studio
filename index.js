@@ -85,17 +85,49 @@
         // Cleanup UI references for deleted messages
     }
 
-    // ================= MVP MODULE STUBS (Phase 1) =================
+    // ================= PHASE 1 MODULES =================
     function processThinkDecoder(messageData) {
-        // 🔍 TODO: Regex extract <think>...</think>
-        // 🧩 Store in data attribute, inject toggle button to message footer
-        if (config.debugMode) console.log(`[Think Decoder] Processing msg ${messageData.id}`);
+        const thinkRaw = JBParser.extractThinkContent(messageData.mes);
+        if (!thinkRaw) return;
+
+        const structured = JBParser.structureThinkContent(thinkRaw);
+        const btnId = `jb-think-${messageData.id}`;
+
+        // Hide original <think> from UI
+        const $msg = $(`[data-id="${messageData.id}"]`);
+        $msg.find('p').each(function() {
+            const html = $(this).html();
+            $(this).html(html.replace(/<think>[\s\S]*?<\/think>/gi, ''));
+        });
+
+        // Inject Toggle Button
+        $msg.find('.mes-buttons').prepend(`
+            <div id="${btnId}" class="jb-think-toggle" title="View CoT Dashboard">
+                🧠 <span>Thinking Process</span>
+            </div>
+        `);
+
+        $(`#${btnId}`).on('click', () => {
+            alert(`[JB Studio] 📊 CoT Summary:\n${structured.summary}\n\nKey Points:\n${structured.keyPoints.join('\n')}`);
+            // Phase 2: จะเปลี่ยนจาก alert เป็น Slide Panel จริง
+        });
     }
 
     function processSlopRadar(messageData) {
-        // 📡 TODO: Dictionary/Regex scan on `messageData.mes`
-        // 🎨 Inject <mark class="jb-slop">...</mark> for matches
-        if (config.debugMode) console.log(`[Slop Radar] Scanning msg ${messageData.id}`);
+        if (!config.slopRadar) return;
+        
+        // ตัวอย่าง Dictionary ชั่วคราว (Phase 2 จะโหลดจาก JSON ภายนอก)
+        const testDict = ['ราวกับว่า', 'ดวงตาเป็นประกาย', 'ความรู้สึกแปลกๆ', 'a shiver ran down'];
+        const matches = JBParser.scanForSlop(messageData.mes, testDict);
+        if (matches.length === 0) return;
+
+        const highlighted = JBParser.applySlopHighlights(messageData.mes, matches);
+        
+        // อัปเดตข้อความใน DOM (ST v1.17 อนุญาตให้แก้ .mes-text ได้)
+        const $msg = $(`[data-id="${messageData.id}"] .mes-text`);
+        $msg.html(highlighted);
+        
+        console.log(`[Slop Radar] 🚨 Found ${matches.length} slop words in msg ${messageData.id}`);
     }
     // ================= UI SETUP =================
     function setupCoreUI() {
